@@ -22,6 +22,18 @@ class RedisService:
         return RedisService.redis_connection.set(key, value)
 
     @staticmethod
+    def incrby(key, amount):
+        return RedisService.redis_connection.incrby(key, amount)
+
+    @staticmethod
+    def ttl(key):
+        return RedisService.redis_connection.ttl(key)
+
+    @staticmethod
+    def expire(key, seconds):
+        return RedisService.redis_connection.expire(key, seconds)
+
+    @staticmethod
     def try_reconnection():
         try:
             RedisService.redis_connection.ping()
