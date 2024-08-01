@@ -1,30 +1,21 @@
-from fastapi import FastAPI
+from functools import wraps
+import time
+from fastapi import FastAPI, Request
 
-from websockets.sync.client import connect
+from redis_service import RedisService
+from worker_service import WorkerService
 
 
-class WorkerService:
-    @staticmethod
-    def start():
-        with connect("ws://localhost:8001/worker/start") as websocket:
-            message = websocket.recv()
-            return message
-
-    @staticmethod
-    def stop():
-        with connect("ws://localhost:8001/worker/stop") as websocket:
-            message = websocket.recv()
-            return message
-
-    @staticmethod
-    def status():
-        with connect("ws://localhost:8001/worker/status") as websocket:
-            message = websocket.recv()
-            return message
+RedisService.check_connection()
+WorkerService.check_connection()
 
 
 app = FastAPI()
 
+EXCLUDED_PATHS_FROM_REQUEST_ACTIVITY = [
+    '/favicon',
+    '/worker/',
+]
 
 @app.get("/weather/cities/{request_id}", tags=["weather"])
 async def cities(request_id: int) -> dict:
@@ -62,3 +53,15 @@ async def worker_stop() -> dict:
 async def worker_start() -> dict:
     message = WorkerService.status()
     return {"message": message}
+
+
+@app.middleware("http")
+async def update_last_request_time(request: Request, call_next):
+    response = await call_next(request)
+    if not any([path in request.url.path for path in EXCLUDED_PATHS_FROM_REQUEST_ACTIVITY]):
+        RedisService.set('last_request_time', int(time.time()))
+
+    return response
+
+
+RedisService.set('last_request_time', int(time.time()))  # Let 'now' be the last activity if the app has just boot up
